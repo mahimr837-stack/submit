@@ -7,7 +7,6 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <style>
-    /* PRESERVING ALL YOUR ORIGINAL STYLES */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { height: 100%; }
     body { font-family: 'DM Sans', 'Segoe UI', sans-serif; background: #F7F6F3; color: #1A1916; }
@@ -27,15 +26,13 @@
     .fade-in { animation: fadeIn 0.3s ease both; }
 
     .nav-btn:hover { background: rgba(45,107,228,0.08) !important; color: #2D6BE4 !important; }
-    .card { transition: box-shadow 0.2s, transform 0.2s; }
+    .card { transition: box-shadow 0.2s, transform 0.2s; background: #fff; border: 1px solid #E4E2DC; border-radius: 10px; overflow: hidden; display: flex; flexDirection: column; }
     .card:hover { box-shadow: 0 4px 18px rgba(0,0,0,0.08); transform: translateY(-2px); }
-    .btn-p:hover:not(:disabled) { filter: brightness(1.08); }
+    .btn-p { background: #2D6BE4; color: #fff; border: none; padding: 10px 22px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px; transition: filter 0.15s; }
+    .btn-p:hover:not(:disabled) { filter: brightness(1.1); }
+    .btn-s { background: #fff; border: 1px solid #E4E2DC; padding: 10px 22px; border-radius: 6px; cursor: pointer; font-size: 13px; }
     .btn-s:hover:not(:disabled) { background: #EDEAE3 !important; }
-    .vote-btn:hover:not(:disabled) { filter: brightness(0.9); }
-    .admin-row:hover { background: #EDEAE3 !important; }
-    .upload-zone:hover { border-color: #2D6BE4 !important; }
-    .no-scroll { overflow: hidden; }
-
+    
     @media (max-width: 580px) { .nav-label { display: none; } }
   </style>
 </head>
@@ -48,346 +45,198 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script type="text/babel">
-const { useState, useEffect, useRef } = React;
+const { useState, useEffect } = React;
 
-/* --- DATABASE CONFIG --- */
-const SUPABASE_URL = "https://bjruudirvlenbouuqytk.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqcnV1ZGlydmxlbmJvdXVxeXRrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgxNjY2ODUsImV4cCI6MjA5Mzc0MjY4NX0.GJzWUrOFdfeKf4nCLV7d0MGfb02wqnhGBIO8wsy97SU";
-const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+/* --- CONFIG --- */
+const SUPABASE_URL = "YOUR_SUPABASE_URL"; 
+const SUPABASE_KEY = "YOUR_SUPABASE_ANON_KEY"; 
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-const ADMIN_PW = "butex@admin2026";
-const CHIPS    = ["#4F7DCA","#5B9B72","#C07D4A","#8B68B0","#4A8FA8","#B05870"];
-const TAGS     = ["Abstract","Geometric","Minimal","Bold","Artistic","Classic"];
+const CHIPS = ["#4F7DCA","#5B9B72","#C07D4A","#8B68B0","#4A8FA8","#B05870"];
 const C = { bg:"#F7F6F3", sur:"#fff", bdr:"#E4E2DC", t1:"#1A1916", t2:"#6B6862", ac:"#2D6BE4" };
 
-const chipColor = id => CHIPS[id % CHIPS.length];
-const pad = n => String(n).padStart(2,"0");
-
-/* --- SHARED COMPONENTS --- */
-function Btn({ children, onClick, primary, danger, disabled, loading }) {
-  return (
-    <button onClick={onClick} disabled={disabled || loading}
-      className={primary ? "btn-p" : "btn-s"}
-      style={{
-        padding:"10px 22px", fontSize:13, fontWeight:600, fontFamily:"inherit",
-        cursor: (disabled || loading) ? "default" : "pointer",
-        border: primary||danger ? "none" : `1px solid ${C.bdr}`,
-        borderRadius:6, background: primary ? C.ac : danger ? "#C0392B" : C.sur,
-        color: primary||danger ? "#fff" : C.t1, opacity: (disabled || loading) ? 0.55 : 1,
-        transition:"filter 0.15s, background 0.15s",
-      }}>{loading ? "Processing..." : children}</button>
-  );
-}
-
-function SmBtn({ children, onClick, red }) {
-  return (
-    <button onClick={onClick} style={{
-      padding:"4px 10px", fontSize:11, fontWeight:600, fontFamily:"inherit",
-      cursor:"pointer", borderRadius:4, border: red ? "1px solid #E8C0C0" : `1px solid ${C.bdr}`,
-      background: red ? "#FDF3F3" : C.sur, color: red ? "#C0392B" : C.t1,
-    }}>{children}</button>
-  );
-}
-
-function Tag({ label, color }) {
-  return (
-    <span style={{
-      display:"inline-block", padding:"2px 8px", borderRadius:4, fontSize:11, fontWeight:600, 
-      background:color+"18", color, border:`1px solid ${color}30`,
-    }}>{label}</span>
-  );
-}
-
-function Card({ s, onVote, voted }) {
-  const color = chipColor(s.id);
-  return (
-    <div className="card" style={{ background:C.sur, border:`1px solid ${C.bdr}`, borderRadius:10, overflow:"hidden", display:"flex", flexDirection:"column" }}>
-      <div style={{
-        height:112, background: s.image_url ? `url(${s.image_url})` : color+"14", 
-        backgroundSize: "cover", backgroundPosition: "center", borderBottom:`1px solid ${C.bdr}`,
-        display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:5, padding:"0 16px"
-      }}>
-        {!s.image_url && (
-          <React.Fragment>
-            <div style={{ width:28, height:2, background:color, opacity:0.7, borderRadius:2 }} />
-            <span style={{ fontSize:9, letterSpacing:2.5, color, fontWeight:700 }}>BUTEX · 2026</span>
-            <span style={{ fontSize:12, fontWeight:700, color:C.t1, textAlign:"center" }}>{s.cover_title}</span>
-            <div style={{ width:28, height:2, background:color, opacity:0.7, borderRadius:2 }} />
-          </React.Fragment>
-        )}
-      </div>
-      <div style={{ padding:"12px 14px", flex:1, display:"flex", flexDirection:"column", gap:8 }}>
-        <div>
-          <div style={{ fontWeight:600, fontSize:13, color:C.t1 }}>{s.cover_title}</div>
-          <div style={{ fontSize:11, color:C.t2, marginTop:2 }}>{s.full_name} · {s.Batch_Section}</div>
-        </div>
-        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginTop:"auto", paddingTop:6 }}>
-          <span style={{ fontSize:13, fontWeight:700, color:C.t1 }}>👍 {s.votes}</span>
-          <button className="vote-btn" onClick={() => onVote(s.id, s.votes)} disabled={voted}
-            style={{
-              padding:"5px 14px", fontSize:12, fontWeight:600, borderRadius:5, 
-              cursor:voted?"default":"pointer", border:`1px solid ${voted ? C.bdr : color}`,
-              background: voted ? C.bg : color, color: voted ? C.t2 : "#fff",
-            }}>{voted ? "✓ Voted" : "Vote"}</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* --- ADMIN PANEL --- */
-function AdminModal({ onClose, subs, onToggle, onDelete, onAdd, refresh }) {
-  const [auth, setAuth] = useState(false);
-  const [pw, setPw] = useState("");
-  const [pwErr, setPwErr] = useState(false);
-  const [tab, setTab] = useState("list");
-  const [aTitle, setATitle] = useState("");
-  const [aName, setAName] = useState("");
-  const [aBatch, setABatch] = useState("");
-
-  useEffect(() => {
-    document.body.classList.add("no-scroll");
-    return () => document.body.classList.remove("no-scroll");
-  }, []);
-
-  const tryLogin = () => {
-    if (pw === ADMIN_PW) { setAuth(true); setPwErr(false); }
-    else setPwErr(true);
-  };
-
-  return (
-    <div onClick={e => e.target===e.currentTarget && onClose()}
-      style={{ position:"fixed", inset:0, zIndex:1000, background:"rgba(0,0,0,0.28)", backdropFilter:"blur(4px)", display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
-      <div style={{ background:C.sur, borderRadius:12, border:`1px solid ${C.bdr}`, width:"100%", maxWidth:620, maxHeight:"88vh", display:"flex", flexDirection:"column", overflow:"hidden", boxShadow:"0 20px 60px rgba(0,0,0,0.13)" }}>
-        <div style={{ padding:"15px 22px", borderBottom:`1px solid ${C.bdr}`, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-          <span style={{ fontWeight:700, fontSize:15 }}>{auth ? "Admin Panel" : "Admin Login"}</span>
-          <div style={{display:'flex', gap:10}}>
-             {auth && <SmBtn onClick={refresh}>Refresh</SmBtn>}
-             <button onClick={onClose} style={{ background:"none", border:"none", fontSize:22, cursor:"pointer", color:C.t2 }}>×</button>
-          </div>
-        </div>
-
-        {!auth ? (
-          <div style={{ padding:40, display:"flex", flexDirection:"column", alignItems:"center", gap:16 }}>
-            <input className="fi" type="password" value={pw} onChange={e => setPw(e.target.value)} onKeyDown={e => e.key==="Enter" && tryLogin()} placeholder="Password" style={{maxWidth:300}} />
-            {pwErr && <p style={{ color:"#C0392B", fontSize:12 }}>Incorrect password.</p>}
-            <Btn primary onClick={tryLogin}>Sign In</Btn>
-          </div>
-        ) : (
-          <div style={{ display:"flex", flexDirection:"column", flex:1, overflow:"hidden" }}>
-            <div style={{ display:"flex", gap:4, padding:"10px 20px", borderBottom:`1px solid ${C.bdr}` }}>
-              {["list","add"].map(k => (
-                <button key={k} onClick={() => setTab(k)} style={{ padding:"6px 16px", fontSize:12, fontWeight:600, borderRadius:5, border:"none", background: tab===k ? C.ac : "transparent", color: tab===k ? "#fff" : C.t2 }}>{k==="list"?"Submissions":"Manual Add"}</button>
-              ))}
-            </div>
-            <div style={{ flex:1, overflowY:"auto", padding:"16px 20px" }}>
-              {tab === "list" && (
-                <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
-                  {subs.length === 0 ? <p style={{fontSize: 13, color: C.t2}}>No submissions found.</p> : 
-                    subs.map(s => (
-                      <div key={s.id} className="admin-row" style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 14px", background:C.bg, borderRadius:8, border:`1px solid ${C.bdr}` }}>
-                        <div style={{ flex:1 }}>
-                          <div style={{ fontWeight:600, fontSize:13 }}>{s.cover_title}</div>
-                          <div style={{ fontSize:11, color:C.t2 }}>{s.full_name}</div>
-                        </div>
-                        <Tag label={s.is_approved?"Visible":"Hidden"} color={s.is_approved?"#2D9A5B":"#B05000"} />
-                        <SmBtn onClick={() => onToggle(s.id, s.is_approved)}>{s.is_approved?"Hide":"Show"}</SmBtn>
-                        <SmBtn red onClick={() => onDelete(s.id)}>Delete</SmBtn>
-                      </div>
-                    ))
-                  }
-                </div>
-              )}
-              {tab === "add" && (
-                <div style={{ display:"flex", flexDirection:"column", gap:14, maxWidth:380 }}>
-                   <input className="fi" value={aName} onChange={e => setAName(e.target.value)} placeholder="Author Name" />
-                   <input className="fi" value={aTitle} onChange={e => setATitle(e.target.value)} placeholder="Cover Title" />
-                   <input className="fi" value={aBatch} onChange={e => setABatch(e.target.value)} placeholder="Batch" />
-                   <Btn primary onClick={() => onAdd({full_name: aName, cover_title: aTitle, Batch_Section: aBatch})}>Add Entry</Btn>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/* --- MAIN APP --- */
 function App() {
   const [page, setPage] = useState("home");
   const [subs, setSubs] = useState([]);
   const [votedIds, setVotedIds] = useState(new Set());
+  const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState("votes");
-  const [adminOpen, setAdminOpen] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [tl, setTl] = useState({ d:12, h:8, m:34, s:59 });
 
+  // Submission Form State
   const [fName, setFName] = useState("");
   const [fBatch, setFBatch] = useState("");
   const [fTitle, setFTitle] = useState("");
-  const [fDesc, setFDesc] = useState("");
-  const [fFb, setFFb] = useState("");
-  const [file, setFile] = useState(null);
-  const fileInputRef = useRef(null);
+  const [submitted, setSubmitted] = useState(false);
 
-  useEffect(() => {
-    fetchData();
-    const t = setInterval(() => {
-      setTl(p => {
-        let { d,h,m,s } = p; s--;
-        if(s<0){s=59;m--;} if(m<0){m=59;h--;} if(h<0){h=23;d--;}
-        return {d,h,m,s};
-      });
-    }, 1000);
-    return () => clearInterval(t);
-  }, []);
+  useEffect(() => { fetchData(); }, []);
 
   async function fetchData() {
-    const { data, error } = await supabaseClient.from('covers').select('*').order('id', { ascending: false });
+    setLoading(true);
+    const { data, error } = await supabase.from('covers').select('*').order('id', { ascending: false });
     if (!error) setSubs(data || []);
+    setLoading(false);
   }
 
   const handleVote = async (id, currentVotes) => {
     if (votedIds.has(id)) return;
-    const { error } = await supabaseClient.from('covers').update({ votes: currentVotes + 1 }).eq('id', id);
-    if (!error) { setVotedIds(p => new Set([...p, id])); fetchData(); }
+    const { error } = await supabase.from('covers').update({ votes: (currentVotes || 0) + 1 }).eq('id', id);
+    if (!error) {
+      setVotedIds(p => new Set([...p, id]));
+      fetchData();
+    }
   };
 
   const handleSubmit = async () => {
-    if (!fName.trim() || !fTitle.trim()) return alert("Name and Title are required.");
-    setLoading(true);
-    try {
-      let imageUrl = null;
-      if (file) {
-        const fileName = `${Date.now()}-${file.name}`;
-        const { error: upErr } = await supabaseClient.storage.from('covers').upload(fileName, file);
-        if (upErr) throw upErr;
-        const { data: urlData } = supabaseClient.storage.from('covers').getPublicUrl(fileName);
-        imageUrl = urlData.publicUrl;
-      }
-
-      const { error: insErr } = await supabaseClient.from('covers').insert([{
-        full_name: fName, Batch_Section: fBatch, cover_title: fTitle,
-        image_url: imageUrl, votes: 0, is_approved: false
-      }]);
-
-      if (insErr) throw insErr;
-      setSubmitted(true);
-      fetchData();
-    } catch (err) { alert(err.message); }
-    finally { setLoading(false); }
+    if (!fName.trim() || !fTitle.trim()) return;
+    const { error } = await supabase.from('covers').insert([
+      { full_name: fName, batch_section: fBatch, cover_title: fTitle, votes: 0, is_approved: false }
+    ]);
+    if (!error) setSubmitted(true);
   };
 
-  const nav = p => { setPage(p); window.scrollTo(0,0); };
-
   const approved = subs.filter(s => s.is_approved);
-  const sorted = [...approved].sort((a,b) => sortBy==="votes" ? (b.votes-a.votes) : (b.id-a.id));
-  const totalVotes = subs.reduce((a,s) => a+(s.votes||0), 0);
+  const sorted = [...approved].sort((a,b) => sortBy==="votes" ? (b.votes - a.votes) : (b.id - a.id));
+  const totalVotes = subs.reduce((a,s) => a + (s.votes || 0), 0);
 
   return (
-    <div style={{ minHeight:"100vh", background:C.bg }}>
+    <div style={{ minHeight: "100vh", background: C.bg }}>
+      {/* Navbar */}
       <nav style={{ position:"sticky", top:0, zIndex:200, background:"rgba(247,246,243,0.94)", backdropFilter:"blur(12px)", borderBottom:`1px solid ${C.bdr}`, padding:"0 24px", height:56, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-        <div onClick={() => nav("home")} style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer" }}>
-          <div style={{ width:28, height:28, background:C.ac, borderRadius:6 }}></div>
+        <div onClick={() => setPage("home")} style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer" }}>
+          <div style={{ width:28, height:28, background:C.ac, borderRadius:6, display:"flex", alignItems:"center", justifyContent:"center" }}>
+            <div style={{ color: "#fff", fontWeight: 900, fontSize: 14 }}>B</div>
+          </div>
           <div>
-            <div style={{ fontSize:13, fontWeight:700, letterSpacing:1 }}>BUTEX</div>
-            <div style={{ fontSize:9, color:C.t2 }}>COVER SELECTION</div>
+            <div style={{ fontSize:13, fontWeight:700, letterSpacing:1, color:C.t1, lineHeight:1 }}>BUTEX</div>
+            <div style={{ fontSize:9, color:C.t2, letterSpacing:0.8 }}>COVER SELECTION</div>
           </div>
         </div>
         <div style={{ display:"flex", gap:2 }}>
-          {["home","gallery","submit","results"].map(p => (
-            <button key={p} className="nav-btn" onClick={() => nav(p)} style={{ background: page===p ? "rgba(45,107,228,0.1)" : "transparent", color: page===p ? C.ac : C.t2, border:"none", borderRadius:6, padding:"6px 13px", fontSize:13, cursor:"pointer" }}>
-              <span className="nav-label">{p.charAt(0).toUpperCase() + p.slice(1)}</span>
-            </button>
+          {["home", "gallery", "submit", "results"].map(p => (
+            <button key={p} className="nav-btn" onClick={() => setPage(p)} style={{
+              background: page===p ? "rgba(45,107,228,0.1)" : "transparent",
+              color: page===p ? C.ac : C.t2,
+              border:"none", borderRadius:6, padding:"6px 13px", fontSize:13, fontWeight:page===p?600:400, cursor:"pointer"
+            }}><span className="nav-label">{p.charAt(0).toUpperCase() + p.slice(1)}</span></button>
           ))}
-          <button onClick={() => setAdminOpen(true)} style={{ background:"none", border:`1px solid ${C.bdr}`, borderRadius:5, padding:"4px 8px", cursor:"pointer", marginLeft:5 }}>⚙</button>
         </div>
       </nav>
 
-      {adminOpen && <AdminModal onClose={() => setAdminOpen(false)} subs={subs} onToggle={async (id, cur) => { await supabaseClient.from('covers').update({is_approved: !cur}).eq('id',id); fetchData(); }} onDelete={async id => { if(confirm("Delete?")) { await supabaseClient.from('covers').delete().eq('id',id); fetchData(); } }} onAdd={async p => { await supabaseClient.from('covers').insert([{...p, votes:0, is_approved:true}]); fetchData(); }} refresh={fetchData} />}
-
-      <main style={{ maxWidth:1080, margin:"0 auto", padding:"0 24px" }}>
-        {page==="home" && (
-          <div className="fade-in">
-            <div style={{ padding:"70px 0 44px", borderBottom:`1px solid ${C.bdr}` }}>
-              <p style={{ fontSize:11, fontWeight:700, letterSpacing:2.5, color:C.ac, textTransform:"uppercase", marginBottom:18 }}>BUTEX · 2026</p>
-              <h1 style={{ fontSize:"clamp(28px,5vw,50px)", fontWeight:700, letterSpacing:-1, lineHeight:1.15, marginBottom:16 }}>Department Cover<br/>Selection</h1>
-              <p style={{ fontSize:15, color:C.t2, maxWidth:400, lineHeight:1.85, marginBottom:32 }}>Submit your design, vote for your favorite, and see which design represents our department in 2026.</p>
-              <div style={{ display:"flex", gap:10 }}>
-                <Btn primary onClick={() => nav("submit")}>Submit Design</Btn>
-                <Btn onClick={() => nav("gallery")}>Browse Designs</Btn>
-              </div>
+      <main style={{ maxWidth: 1080, margin: "0 auto", padding: "0 24px" }}>
+        
+        {/* HOME PAGE */}
+        {page === "home" && (
+          <div className="fade-in" style={{ padding: "70px 0" }}>
+            <h1 style={{ fontSize: "clamp(32px, 5vw, 48px)", fontWeight: 700, marginBottom: 16 }}>Department Cover Selection</h1>
+            <p style={{ fontSize: 16, color: C.t2, maxWidth: 450, lineHeight: 1.6, marginBottom: 32 }}>
+              Submit your cover design and vote for the vision that represents BUTEX in 2026.
+            </p>
+            <div style={{ display: "flex", gap: 12 }}>
+              <button className="btn-p" onClick={() => setPage("submit")}>Submit Design</button>
+              <button className="btn-s" onClick={() => setPage("gallery")}>Browse Gallery</button>
             </div>
-            <div style={{ display:"flex", gap:14, padding:"26px 0 30px", borderBottom:`1px solid ${C.bdr}`, flexWrap:"wrap" }}>
-              {[{l:"Submissions",v:approved.length},{l:"Total Votes",v:totalVotes},{l:"Days Left",v:tl.d},{l:"Time Left",v:`${pad(tl.h)}:${pad(tl.m)}:${pad(tl.s)}`}].map(i => (
-                <div key={i.l} style={{ padding:"14px 22px", background:C.sur, borderRadius:8, border:`1px solid ${C.bdr}`, minWidth:110, textAlign:"center" }}>
-                  <div style={{ fontSize:22, fontWeight:700 }}>{i.v}</div>
-                  <div style={{ fontSize:11, color:C.t2 }}>{i.l}</div>
+            <div style={{ display:"flex", gap:14, marginTop: 48 }}>
+                <div style={{ padding:"14px 22px", background:C.sur, borderRadius:8, border:`1px solid ${C.bdr}`, textAlign:"center" }}>
+                  <div style={{ fontSize:22, fontWeight:700 }}>{approved.length}</div>
+                  <div style={{ fontSize:11, color:C.t2 }}>Submissions</div>
                 </div>
-              ))}
+                <div style={{ padding:"14px 22px", background:C.sur, borderRadius:8, border:`1px solid ${C.bdr}`, textAlign:"center" }}>
+                  <div style={{ fontSize:22, fontWeight:700 }}>{totalVotes}</div>
+                  <div style={{ fontSize:11, color:C.t2 }}>Total Votes</div>
+                </div>
             </div>
           </div>
         )}
 
-        {page==="gallery" && (
-          <div className="fade-in" style={{ padding:"48px 0" }}>
-            <h1 style={{ fontSize:26, fontWeight:700, marginBottom:26 }}>Gallery</h1>
-            <div style={{ display:"flex", gap:8, marginBottom:28 }}>
-              {["votes","newest"].map(v => (
-                <button key={v} onClick={() => setSortBy(v)} style={{ padding:"6px 14px", fontSize:12, fontWeight:600, borderRadius:5, cursor:"pointer", background: sortBy===v?C.ac:C.sur, color: sortBy===v?"#fff":C.t2, border:`1px solid ${sortBy===v?C.ac:C.bdr}` }}>{v==="votes"?"Top Voted":"Newest"}</button>
-              ))}
-            </div>
-            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(210px,1fr))", gap:14 }}>
-              {sorted.map(s => <Card key={s.id} s={s} onVote={handleVote} voted={votedIds.has(s.id)} />)}
-            </div>
-          </div>
-        )}
-
-        {page==="submit" && (
-          <div className="fade-in" style={{ maxWidth:480, padding:"52px 0" }}>
-            {submitted ? (
-              <div style={{ textAlign:"center" }}>
-                <h2 style={{ color:"#2D9A5B" }}>Submitted!</h2>
-                <p style={{ margin:"10px 0 20px" }}>Pending admin review.</p>
-                <Btn primary onClick={() => setSubmitted(false)}>Submit Another</Btn>
-              </div>
-            ) : (
-              <div style={{ display:"flex", flexDirection:"column", gap:18 }}>
-                <h1>Submit Design</h1>
-                <input className="fi" placeholder="Full Name" value={fName} onChange={e=>setFName(e.target.value)} />
-                <input className="fi" placeholder="Batch / Section" value={fBatch} onChange={e=>setFBatch(e.target.value)} />
-                <input className="fi" placeholder="Cover Title" value={fTitle} onChange={e=>setFTitle(e.target.value)} />
-                <textarea className="fi" placeholder="Description" rows={3} value={fDesc} onChange={e=>setFDesc(e.target.value)} />
-                <div className="upload-zone" onClick={()=>fileInputRef.current.click()} style={{ border:`2px dashed ${C.bdr}`, padding:30, textAlign:"center", cursor:"pointer", borderRadius:8 }}>
-                  {file ? file.name : "Click to Upload Design"}
-                  <input type="file" ref={fileInputRef} hidden onChange={e=>setFile(e.target.files[0])} />
+        {/* GALLERY PAGE */}
+        {page === "gallery" && (
+          <div className="fade-in" style={{ padding: "48px 0" }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-end", marginBottom: 28 }}>
+                <div>
+                    <h1 style={{ fontSize: 26, fontWeight: 700 }}>Gallery</h1>
+                    <p style={{ fontSize: 13, color: C.t2 }}>{approved.length} approved designs</p>
                 </div>
-                <Btn primary onClick={handleSubmit} loading={loading}>Submit Design</Btn>
+                <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => setSortBy("votes")} style={{ padding:"6px 12px", borderRadius:6, border:`1px solid ${C.bdr}`, background: sortBy==="votes"?C.ac:C.sur, color: sortBy==="votes"?"#fff":C.t1, cursor:"pointer", fontSize:12 }}>Top Voted</button>
+                    <button onClick={() => setSortBy("newest")} style={{ padding:"6px 12px", borderRadius:6, border:`1px solid ${C.bdr}`, background: sortBy==="newest"?C.ac:C.sur, color: sortBy==="newest"?"#fff":C.t1, cursor:"pointer", fontSize:12 }}>Newest</button>
+                </div>
+            </div>
+
+            {loading ? <p>Loading...</p> : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 20 }}>
+                {sorted.map(s => {
+                  const color = CHIPS[s.id % CHIPS.length];
+                  return (
+                    <div key={s.id} className="card">
+                      <div style={{ height: 112, background: color + "14", borderBottom: `1px solid ${C.bdr}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                         {s.image_url ? <img src={s.image_url} style={{width:'100%', height:'100%', objectFit:'cover'}} /> : <span style={{fontSize:10, fontWeight:700, color}}>BUTEX 2026</span>}
+                      </div>
+                      <div style={{ padding: 16 }}>
+                        <h3 style={{ fontSize: 15, marginBottom: 4 }}>{s.cover_title}</h3>
+                        <p style={{ fontSize: 12, color: C.t2, marginBottom: 16 }}>{s.full_name} • {s.batch_section}</p>
+                        <button className="btn-p" style={{ width:'100%', background: votedIds.has(s.id) ? C.bg : color, color: votedIds.has(s.id) ? '#999' : '#fff', border: votedIds.has(s.id)?`1px solid ${C.bdr}`:'none' }}
+                          disabled={votedIds.has(s.id)} onClick={() => handleVote(s.id, s.votes)}>
+                          {votedIds.has(s.id) ? "✓ Voted" : `Vote (${s.votes || 0})`}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
         )}
 
-        {page==="results" && (
-          <div className="fade-in" style={{ padding:"48px 0" }}>
-            <h1 style={{ fontSize:26, fontWeight:700, marginBottom:36 }}>Rankings</h1>
-            <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-              {sorted.map((s,i) => (
-                <div key={s.id} style={{ background:C.sur, border:`1px solid ${C.bdr}`, borderRadius:8, padding:16, display:"flex", alignItems:"center", gap:15 }}>
-                   <div style={{ width:30, fontWeight:700 }}>#{i+1}</div>
-                   <div style={{ flex:1 }}>
-                      <div style={{ fontWeight:600 }}>{s.cover_title}</div>
-                      <div style={{ fontSize:11, color:C.t2 }}>{s.full_name}</div>
-                   </div>
-                   <div style={{ fontWeight:700 }}>{s.votes} Votes</div>
-                </div>
-              ))}
+        {/* RESULTS PAGE */}
+        {page === "results" && (
+          <div className="fade-in" style={{ padding: "48px 0" }}>
+            <h1 style={{ fontSize: 26, fontWeight: 700, marginBottom: 32 }}>Live Rankings</h1>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {sorted.map((s, i) => {
+                const pct = Math.round((s.votes / (sorted[0]?.votes || 1)) * 100);
+                return (
+                  <div key={s.id} style={{ background: C.sur, border: `1px solid ${C.bdr}`, borderRadius: 8, padding: "12px 16px", display: "flex", alignItems: "center", gap: 16 }}>
+                    <div style={{ width: 30, fontWeight: 700, color: i === 0 ? "#D4A800" : C.t2 }}>#{i + 1}</div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 600, fontSize: 14 }}>{s.cover_title}</div>
+                      <div style={{ fontSize: 11, color: C.t2 }}>{s.full_name}</div>
+                    </div>
+                    <div style={{ width: 120 }}>
+                       <div style={{ fontSize: 12, fontWeight: 700, textAlign: 'right' }}>{s.votes} votes</div>
+                       <div style={{ height: 4, background: C.bg, borderRadius: 2, marginTop: 4 }}>
+                          <div style={{ height: '100%', background: C.ac, width: `${pct}%`, borderRadius: 2 }} />
+                       </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
+
+        {/* SUBMIT PAGE */}
+        {page === "submit" && (
+            <div className="fade-in" style={{ maxWidth: 480, padding: "52px 0" }}>
+                {submitted ? (
+                    <div style={{textAlign:'center'}}>
+                        <h2 style={{color:'#2D9A5B'}}>Submitted!</h2>
+                        <p style={{margin:'16px 0', fontSize:14, color:C.t2}}>Your design is pending admin approval.</p>
+                        <button className="btn-p" onClick={() => { setPage("gallery"); setSubmitted(false); }}>Go to Gallery</button>
+                    </div>
+                ) : (
+                    <div>
+                        <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 24 }}>Submit Your Design</h1>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                            <input className="fi" placeholder="Full Name" value={fName} onChange={e => setFName(e.target.value)} />
+                            <input className="fi" placeholder="Batch / Section" value={fBatch} onChange={e => setFBatch(e.target.value)} />
+                            <input className="fi" placeholder="Cover Title" value={fTitle} onChange={e => setFTitle(e.target.value)} />
+                            <button className="btn-p" onClick={handleSubmit}>Submit for Review</button>
+                        </div>
+                    </div>
+                )}
+            </div>
+        )}
+
       </main>
     </div>
   );
