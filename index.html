@@ -62,11 +62,12 @@ const { useState, useEffect, useRef } = React;
 /* ── Supabase Configuration ────────────────────────────────────────────── */
 const SUPABASE_URL = "https://bjruudirvlenbouuqytk.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqcnV1ZGlydmxlbmJvdXVxeXRrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgxNjY2ODUsImV4cCI6MjA5Mzc0MjY4NX0.GJzWUrOFdfeKf4nCLV7d0MGfb02wqnhGBIO8wsy97SU";
-const supabase = libsupabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// FIX: Accessing supabase directly from the window object provided by the CDN
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const ADMIN_PW = "butex@admin2026";
 const CHIPS    = ["#4F7DCA","#5B9B72","#C07D4A","#8B68B0","#4A8FA8","#B05870"];
-const TAGS     = ["Abstract","Geometric","Minimal","Bold","Artistic","Classic"];
 const C = { bg:"#F7F6F3", sur:"#fff", bdr:"#E4E2DC", t1:"#1A1916", t2:"#6B6862", ac:"#2D6BE4" };
 
 const chipColor = id => CHIPS[id % CHIPS.length];
@@ -229,6 +230,7 @@ function AdminModal({ onClose, subs, onToggle, onDelete, onAdd }) {
             <div style={{ flex:1, overflowY:"auto", padding:"16px 20px" }}>
               {tab === "list" && (
                 <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+                  {subs.length === 0 && <p style={{fontSize: 13, color: C.t2}}>No submissions found.</p>}
                   {subs.map(s => (
                     <div key={s.id} className="admin-row" style={{
                       display:"flex", alignItems:"center", gap:10, flexWrap:"wrap",
@@ -295,16 +297,22 @@ function App() {
   }, []);
 
   async function fetchSubmissions() {
-    const { data, error } = await supabase.from('covers').select('*').order('votes', { ascending: false });
-    if (!error) setSubs(data);
+    const { data, error } = await supabaseClient.from('covers').select('*').order('votes', { ascending: false });
+    if (!error && data) {
+        setSubs(data);
+    } else {
+        console.error("Error fetching data:", error);
+    }
   }
 
   const handleVote = async (id, currentVotes) => {
     if (votedIds.has(id)) return;
-    const { error } = await supabase.from('covers').update({ votes: currentVotes + 1 }).eq('id', id);
+    const { error } = await supabaseClient.from('covers').update({ votes: currentVotes + 1 }).eq('id', id);
     if (!error) {
       setVotedIds(p => new Set([...p, id]));
       fetchSubmissions();
+    } else {
+        alert("Failed to register vote. Check database permissions.");
     }
   };
 
@@ -317,12 +325,12 @@ function App() {
       const fileName = `${Math.random()}.${fileExt}`;
       const filePath = `${fileName}`;
 
-      const { error: uploadError } = await supabase.storage.from('covers').upload(filePath, file);
+      const { error: uploadError } = await supabaseClient.storage.from('covers').upload(filePath, file);
       if (uploadError) throw uploadError;
 
-      const { data: urlData } = supabase.storage.from('covers').getPublicUrl(filePath);
+      const { data: urlData } = supabaseClient.storage.from('covers').getPublicUrl(filePath);
 
-      const { error: insertError } = await supabase.from('covers').insert([{
+      const { error: insertError } = await supabaseClient.from('covers').insert([{
         full_name: fName,
         Batch_Section: fBatch,
         cover_title: fTitle,
@@ -337,26 +345,26 @@ function App() {
       setSubmitted(true);
       fetchSubmissions();
     } catch (err) {
-      alert(err.message);
+      alert("Submission error: " + err.message);
     } finally {
       setLoading(false);
     }
   };
 
   const handleAdminToggle = async (id, currentStatus) => {
-    await supabase.from('covers').update({ is_approved: !currentStatus }).eq('id', id);
+    await supabaseClient.from('covers').update({ is_approved: !currentStatus }).eq('id', id);
     fetchSubmissions();
   };
 
   const handleAdminDelete = async (id) => {
     if(confirm("Delete this entry?")) {
-      await supabase.from('covers').delete().eq('id', id);
+      await supabaseClient.from('covers').delete().eq('id', id);
       fetchSubmissions();
     }
   };
 
   const handleAdminAdd = async (payload) => {
-    await supabase.from('covers').insert([{...payload, votes:0, is_approved:true}]);
+    await supabaseClient.from('covers').insert([{...payload, votes:0, is_approved:true}]);
     fetchSubmissions();
   };
 
@@ -427,9 +435,13 @@ function App() {
           <div className="fade-in" style={{ padding:"48px 0 72px" }}>
             <h1 style={{ fontSize:26, fontWeight:700, marginBottom:6, color:C.t1 }}>Gallery</h1>
             <p style={{ fontSize:13, color:C.t2, marginBottom:26 }}>{approved.length} design{approved.length!==1?"s":""} from the community</p>
-            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(210px,1fr))", gap:14 }}>
-              {sorted.map(s => <Card key={s.id} s={s} onVote={handleVote} voted={votedIds.has(s.id)} />)}
-            </div>
+            {approved.length === 0 ? (
+               <p style={{ color:C.t2, fontSize:14 }}>No approved submissions yet.</p>
+            ) : (
+               <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(210px,1fr))", gap:14 }}>
+                 {sorted.map(s => <Card key={s.id} s={s} onVote={handleVote} voted={votedIds.has(s.id)} />)}
+               </div>
+            )}
           </div>
         )}
 
@@ -472,18 +484,22 @@ function App() {
         {page==="results" && (
           <div className="fade-in" style={{ padding:"48px 0 72px" }}>
             <h1 style={{ fontSize:26, fontWeight:700, marginBottom:36, color:C.t1 }}>Live Rankings</h1>
-            <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
-              {sorted.map((s,i) => (
-                <div key={s.id} style={{ background:C.sur, border:`1px solid ${C.bdr}`, borderRadius:8, padding:"12px 16px", display:"flex", alignItems:"center", gap:12 }}>
-                  <div style={{ width:28, height:28, borderRadius:"50%", background:C.bg, display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700 }}>{i+1}</div>
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontWeight:600, fontSize:13 }}>{s.cover_title}</div>
-                    <div style={{ fontSize:11, color:C.t2 }}>{s.full_name}</div>
-                  </div>
-                  <div style={{ fontSize:13, fontWeight:700 }}>{s.votes} votes</div>
-                </div>
-              ))}
-            </div>
+            {sorted.length === 0 ? (
+               <p style={{ color:C.t2, fontSize:14 }}>No submissions to show yet.</p>
+            ) : (
+               <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+                 {sorted.map((s,i) => (
+                   <div key={s.id} style={{ background:C.sur, border:`1px solid ${C.bdr}`, borderRadius:8, padding:"12px 16px", display:"flex", alignItems:"center", gap:12 }}>
+                     <div style={{ width:28, height:28, borderRadius:"50%", background:C.bg, display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700 }}>{i+1}</div>
+                     <div style={{ flex:1 }}>
+                       <div style={{ fontWeight:600, fontSize:13 }}>{s.cover_title}</div>
+                       <div style={{ fontSize:11, color:C.t2 }}>{s.full_name}</div>
+                     </div>
+                     <div style={{ fontSize:13, fontWeight:700 }}>{s.votes} votes</div>
+                   </div>
+                 ))}
+               </div>
+            )}
           </div>
         )}
       </main>
