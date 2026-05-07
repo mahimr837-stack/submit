@@ -12,25 +12,40 @@
     body { font-family: 'DM Sans', 'Segoe UI', sans-serif; background: #F7F6F3; color: #1A1916; }
     ::-webkit-scrollbar { width: 4px; }
     ::-webkit-scrollbar-thumb { background: #D4D0C8; border-radius: 2px; }
-    .fi { width: 100%; padding: 9px 12px; font-size: 13px; font-family: inherit; border: 1px solid #E4E2DC; border-radius: 6px; background: #fff; color: #1A1916; outline: none; transition: border-color 0.15s; display: block; }
+
+    .fi {
+      width: 100%;
+      padding: 9px 12px;
+      font-size: 13px;
+      font-family: inherit;
+      border: 1px solid #E4E2DC;
+      border-radius: 6px;
+      background: #fff;
+      color: #1A1916;
+      outline: none;
+      transition: border-color 0.15s;
+      display: block;
+    }
     .fi:focus { border-color: #2D6BE4; }
     .fi::placeholder { color: #B0ADA6; }
     textarea.fi { resize: vertical; }
+
     @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
     .fade-in { animation: fadeIn 0.3s ease both; }
+
     .nav-btn:hover { background: rgba(45,107,228,0.08) !important; color: #2D6BE4 !important; }
-    .card { transition: box-shadow 0.2s, transform 0.2s; background: #fff; border: 1px solid #E4E2DC; border-radius: 10px; overflow: hidden; display: flex; flexDirection: column; }
+    .card { transition: box-shadow 0.2s, transform 0.2s; }
     .card:hover { box-shadow: 0 4px 18px rgba(0,0,0,0.08); transform: translateY(-2px); }
-    .btn-p { padding: 10px 22px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; border-radius: 6px; background: #2D6BE4; color: #fff; transition: filter 0.15s; }
     .btn-p:hover:not(:disabled) { filter: brightness(1.08); }
-    .btn-p:disabled { opacity: 0.5; cursor: default; }
-    .btn-s { padding: 10px 22px; font-size: 13px; font-weight: 600; cursor: pointer; border: 1px solid #E4E2DC; border-radius: 6px; background: #fff; color: #1A1916; transition: background 0.15s; }
-    .btn-s:hover { background: #EDEAE3; }
-    .vote-btn { padding: 5px 14px; font-size: 12px; font-weight: 600; border-radius: 5px; cursor: pointer; transition: filter 0.15s; border: 1px solid #2D6BE4; background: #2D6BE4; color: #fff; }
-    .vote-btn:disabled { background: #F7F6F3; color: #6B6862; border-color: #E4E2DC; cursor: default; }
+    .btn-s:hover:not(:disabled) { background: #EDEAE3 !important; }
+    .vote-btn:hover:not(:disabled) { filter: brightness(0.9); }
     .admin-row:hover { background: #EDEAE3 !important; }
-    .upload-zone { border: 2px dashed #E4E2DC; border-radius: 8px; padding: 28px 20px; textAlign: center; cursor: pointer; transition: border-color 0.2s; }
-    .upload-zone:hover { border-color: #2D6BE4; }
+    .upload-zone:hover { border-color: #2D6BE4 !important; }
+    .no-scroll { overflow: hidden; }
+
+    @media (max-width: 580px) {
+      .nav-label { display: none; }
+    }
   </style>
 </head>
 <body>
@@ -39,201 +54,439 @@
 <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script type="text/babel">
 const { useState, useEffect, useRef } = React;
 
-// ── SUPABASE CONNECTION ──
+/* ── Supabase Configuration ────────────────────────────────────────────── */
 const SUPABASE_URL = "https://bjruudirvlenbouuqytk.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqcnV1ZGlydmxlbmJvdXVxeXRrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgxNjY2ODUsImV4cCI6MjA5Mzc0MjY4NX0.GJzWUrOFdfeKf4nCLV7d0MGfb02wqnhGBIO8wsy97SU";
-const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const supabase = libsupabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const ADMIN_PW = "butex@admin2026";
+const CHIPS    = ["#4F7DCA","#5B9B72","#C07D4A","#8B68B0","#4A8FA8","#B05870"];
+const TAGS     = ["Abstract","Geometric","Minimal","Bold","Artistic","Classic"];
 const C = { bg:"#F7F6F3", sur:"#fff", bdr:"#E4E2DC", t1:"#1A1916", t2:"#6B6862", ac:"#2D6BE4" };
 
+const chipColor = id => CHIPS[id % CHIPS.length];
+const pad = n => String(n).padStart(2,"0");
+
+/* ── UI Components ──────────────────────────────────────────────────────── */
+function Btn({ children, onClick, primary, danger, disabled, loading }) {
+  return (
+    <button onClick={onClick} disabled={disabled || loading}
+      className={primary ? "btn-p" : "btn-s"}
+      style={{
+        padding:"10px 22px", fontSize:13, fontWeight:600, fontFamily:"inherit",
+        cursor: (disabled || loading) ? "default" : "pointer",
+        border: primary||danger ? "none" : `1px solid ${C.bdr}`,
+        borderRadius:6,
+        background: primary ? C.ac : danger ? "#C0392B" : C.sur,
+        color: primary||danger ? "#fff" : C.t1,
+        opacity: (disabled || loading) ? 0.55 : 1,
+        transition:"filter 0.15s, background 0.15s",
+      }}>{loading ? "Processing..." : children}</button>
+  );
+}
+
+function SmBtn({ children, onClick, red }) {
+  return (
+    <button onClick={onClick} style={{
+      padding:"4px 10px", fontSize:11, fontWeight:600, fontFamily:"inherit",
+      cursor:"pointer", borderRadius:4,
+      border: red ? "1px solid #E8C0C0" : `1px solid ${C.bdr}`,
+      background: red ? "#FDF3F3" : C.sur,
+      color: red ? "#C0392B" : C.t1,
+    }}>{children}</button>
+  );
+}
+
+function Tag({ label, color }) {
+  return (
+    <span style={{
+      display:"inline-block", padding:"2px 8px", borderRadius:4,
+      fontSize:11, fontWeight:600, letterSpacing:0.4,
+      background:color+"18", color, border:`1px solid ${color}30`,
+    }}>{label}</span>
+  );
+}
+
+function Card({ s, onVote, voted }) {
+  const color = chipColor(s.id);
+  return (
+    <div className="card" style={{
+      background:C.sur, border:`1px solid ${C.bdr}`,
+      borderRadius:10, overflow:"hidden", display:"flex", flexDirection:"column",
+    }}>
+      <div style={{
+        height:112, background: s.image_url ? `url(${s.image_url})` : color+"14", 
+        backgroundSize: "cover", backgroundPosition: "center",
+        borderBottom:`1px solid ${C.bdr}`,
+        display:"flex", flexDirection:"column",
+        alignItems:"center", justifyContent:"center", gap:5, padding:"0 16px",
+        position: 'relative'
+      }}>
+        {!s.image_url && (
+          <>
+            <div style={{ width:28, height:2, background:color, opacity:0.7, borderRadius:2 }} />
+            <span style={{ fontSize:9, letterSpacing:2.5, color, fontWeight:700 }}>BUTEX · 2026</span>
+            <span style={{ fontSize:12, fontWeight:700, color:C.t1, textAlign:"center", lineHeight:1.3 }}>{s.cover_title}</span>
+            <div style={{ width:28, height:2, background:color, opacity:0.7, borderRadius:2 }} />
+          </>
+        )}
+      </div>
+      <div style={{ padding:"12px 14px", flex:1, display:"flex", flexDirection:"column", gap:8 }}>
+        <div>
+          <div style={{ fontWeight:600, fontSize:13, color:C.t1 }}>{s.cover_title}</div>
+          <div style={{ fontSize:11, color:C.t2, marginTop:2 }}>{s.full_name} · {s.Batch_Section}</div>
+        </div>
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginTop:"auto", paddingTop:6 }}>
+          <span style={{ fontSize:13, fontWeight:700, color:C.t1 }}>👍 {s.votes}</span>
+          <button className="vote-btn" onClick={() => onVote(s.id, s.votes)} disabled={voted}
+            style={{
+              padding:"5px 14px", fontSize:12, fontWeight:600, fontFamily:"inherit",
+              borderRadius:5, cursor:voted?"default":"pointer",
+              border:`1px solid ${voted ? C.bdr : color}`,
+              background: voted ? C.bg : color,
+              color: voted ? C.t2 : "#fff",
+              transition:"filter 0.15s",
+            }}>{voted ? "✓ Voted" : "Vote"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Admin Modal ─────────────────────────────────────────────────────────── */
+function AdminModal({ onClose, subs, onToggle, onDelete, onAdd }) {
+  const [auth, setAuth] = useState(false);
+  const [pw, setPw] = useState("");
+  const [pwErr, setPwErr] = useState(false);
+  const [tab, setTab] = useState("list");
+  const [aTitle, setATitle] = useState("");
+  const [aName, setAName] = useState("");
+  const [aBatch, setABatch] = useState("");
+
+  useEffect(() => {
+    document.body.classList.add("no-scroll");
+    return () => document.body.classList.remove("no-scroll");
+  }, []);
+
+  const tryLogin = () => {
+    if (pw === ADMIN_PW) { setAuth(true); setPwErr(false); }
+    else setPwErr(true);
+  };
+
+  return (
+    <div onClick={e => e.target===e.currentTarget && onClose()}
+      style={{
+        position:"fixed", inset:0, zIndex:1000,
+        background:"rgba(0,0,0,0.28)", backdropFilter:"blur(4px)",
+        display:"flex", alignItems:"center", justifyContent:"center", padding:16,
+      }}>
+      <div style={{
+        background:C.sur, borderRadius:12, border:`1px solid ${C.bdr}`,
+        width:"100%", maxWidth:620, maxHeight:"88vh",
+        display:"flex", flexDirection:"column", overflow:"hidden",
+        boxShadow:"0 20px 60px rgba(0,0,0,0.13)",
+      }}>
+        <div style={{
+          padding:"15px 22px", borderBottom:`1px solid ${C.bdr}`,
+          display:"flex", alignItems:"center", justifyContent:"space-between",
+        }}>
+          <span style={{ fontWeight:700, fontSize:15 }}>{auth ? "Admin Panel" : "Admin Login"}</span>
+          <button onClick={onClose} style={{ background:"none", border:"none", fontSize:22, cursor:"pointer", color:C.t2 }}>×</button>
+        </div>
+
+        {!auth ? (
+          <div style={{ padding:40, display:"flex", flexDirection:"column", alignItems:"center", gap:16 }}>
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke={C.ac} strokeWidth="1.5" strokeLinecap="round">
+              <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+            <p style={{ fontSize:13, color:C.t2 }}>Enter the admin password to continue.</p>
+            <div style={{ width:"100%", maxWidth:300 }}>
+              <input className="fi" type="password" value={pw}
+                onChange={e => { setPw(e.target.value); setPwErr(false); }}
+                onKeyDown={e => e.key==="Enter" && tryLogin()}
+                placeholder="Password" />
+              {pwErr && <p style={{ color:"#C0392B", fontSize:12, marginTop:6 }}>Incorrect password.</p>}
+            </div>
+            <Btn primary onClick={tryLogin}>Sign In</Btn>
+          </div>
+        ) : (
+          <div style={{ display:"flex", flexDirection:"column", flex:1, overflow:"hidden" }}>
+            <div style={{ display:"flex", gap:4, padding:"10px 20px", borderBottom:`1px solid ${C.bdr}` }}>
+              {[["list","Submissions"],["add","Add Manual"]].map(([k,l]) => (
+                <button key={k} onClick={() => setTab(k)} style={{
+                  padding:"6px 16px", fontSize:12, fontWeight:600, fontFamily:"inherit",
+                  borderRadius:5, cursor:"pointer", border:"none",
+                  background: tab===k ? C.ac : "transparent", color: tab===k ? "#fff" : C.t2,
+                }}>{l}</button>
+              ))}
+            </div>
+
+            <div style={{ flex:1, overflowY:"auto", padding:"16px 20px" }}>
+              {tab === "list" && (
+                <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+                  {subs.map(s => (
+                    <div key={s.id} className="admin-row" style={{
+                      display:"flex", alignItems:"center", gap:10, flexWrap:"wrap",
+                      padding:"10px 14px", background:C.bg, borderRadius:8,
+                      border:`1px solid ${C.bdr}`,
+                    }}>
+                      <div style={{ flex:1, minWidth:100 }}>
+                        <div style={{ fontWeight:600, fontSize:13 }}>{s.cover_title}</div>
+                        <div style={{ fontSize:11, color:C.t2 }}>{s.full_name} · {s.Batch_Section}</div>
+                      </div>
+                      <Tag label={s.is_approved?"Visible":"Hidden"} color={s.is_approved?"#2D9A5B":"#B05000"} />
+                      <SmBtn onClick={() => onToggle(s.id, s.is_approved)}>{s.is_approved?"Hide":"Show"}</SmBtn>
+                      <SmBtn red onClick={() => onDelete(s.id)}>Delete</SmBtn>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {tab === "add" && (
+                <div style={{ display:"flex", flexDirection:"column", gap:14, maxWidth:380 }}>
+                   <input className="fi" value={aName} onChange={e => setAName(e.target.value)} placeholder="Author Name" />
+                   <input className="fi" value={aTitle} onChange={e => setATitle(e.target.value)} placeholder="Cover Title" />
+                   <input className="fi" value={aBatch} onChange={e => setABatch(e.target.value)} placeholder="Batch" />
+                   <Btn primary onClick={() => onAdd({full_name: aName, cover_title: aTitle, Batch_Section: aBatch})}>Add Entry</Btn>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ── Main App ────────────────────────────────────────────────────────────── */
 function App() {
   const [page, setPage] = useState("home");
   const [subs, setSubs] = useState([]);
-  const [loading, setLoading] = useState(false);
   const [votedIds, setVotedIds] = useState(new Set());
+  const [sortBy, setSortBy] = useState("votes");
   const [adminOpen, setAdminOpen] = useState(false);
-  const [isAuth, setIsAuth] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [tl, setTl] = useState({ d:12, h:8, m:34, s:59 });
-  const fileInputRef = useRef(null);
 
-  // Form states
   const [fName, setFName] = useState("");
   const [fBatch, setFBatch] = useState("");
   const [fTitle, setFTitle] = useState("");
   const [fDesc, setFDesc] = useState("");
   const [fFb, setFFb] = useState("");
-  const [fFile, setFFile] = useState(null);
+  const [file, setFile] = useState(null);
+  
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     fetchSubmissions();
-    const timer = setInterval(() => {
+    const t = setInterval(() => {
       setTl(p => {
         let { d,h,m,s } = p; s--;
         if(s<0){s=59;m--;} if(m<0){m=59;h--;} if(h<0){h=23;d--;}
         return {d,h,m,s};
       });
     }, 1000);
-    return () => clearInterval(timer);
+    return () => clearInterval(t);
   }, []);
 
   async function fetchSubmissions() {
-    const { data, error } = await supabaseClient.from('covers').select('*').order('votes', { ascending: false });
+    const { data, error } = await supabase.from('covers').select('*').order('votes', { ascending: false });
     if (!error) setSubs(data);
   }
 
-  const handleUpload = async () => {
-    if (!fName || !fTitle || !fFile) return alert("Required: Name, Title, and Design File!");
-    setLoading(true);
-    try {
-      const fileExt = fFile.name.split('.').pop();
-      const fileName = `${Date.now()}.${fileExt}`;
-      const { error: uploadError } = await supabaseClient.storage.from('covers').upload(fileName, fFile);
-      if (uploadError) throw uploadError;
-
-      const { data: urlData } = supabaseClient.storage.from('covers').getPublicUrl(fileName);
-      
-      const { error: dbError } = await supabaseClient.from('covers').insert([{
-        full_name: fName, Batch_Section: fBatch, cover_title: fTitle,
-        description: fDesc, facebook_profile: fFb, image_url: urlData.publicUrl,
-        is_approved: false, votes: 0
-      }]);
-      if (dbError) throw dbError;
-
-      alert("Successfully submitted for review!");
-      setPage("home");
-      fetchSubmissions();
-    } catch (err) { alert(err.message); }
-    setLoading(false);
-  };
-
   const handleVote = async (id, currentVotes) => {
     if (votedIds.has(id)) return;
-    const { error } = await supabaseClient.from('covers').update({ votes: currentVotes + 1 }).eq('id', id);
+    const { error } = await supabase.from('covers').update({ votes: currentVotes + 1 }).eq('id', id);
     if (!error) {
-      setVotedIds(prev => new Set([...prev, id]));
+      setVotedIds(p => new Set([...p, id]));
       fetchSubmissions();
     }
   };
 
-  const toggleApproval = async (id, status) => {
-    const { error } = await supabaseClient.from('covers').update({ is_approved: !status }).eq('id', id);
-    if (!error) fetchSubmissions();
+  const handleSubmit = async () => {
+    if (!fName.trim() || !fTitle.trim() || !file) return alert("Name, Title and Image are required.");
+    setLoading(true);
+    
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random()}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      const { error: uploadError } = await supabase.storage.from('covers').upload(filePath, file);
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage.from('covers').getPublicUrl(filePath);
+
+      const { error: insertError } = await supabase.from('covers').insert([{
+        full_name: fName,
+        Batch_Section: fBatch,
+        cover_title: fTitle,
+        description: fDesc,
+        facebook_profile: fFb,
+        image_url: urlData.publicUrl,
+        votes: 0,
+        is_approved: false
+      }]);
+
+      if (insertError) throw insertError;
+      setSubmitted(true);
+      fetchSubmissions();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAdminToggle = async (id, currentStatus) => {
+    await supabase.from('covers').update({ is_approved: !currentStatus }).eq('id', id);
+    fetchSubmissions();
+  };
+
+  const handleAdminDelete = async (id) => {
+    if(confirm("Delete this entry?")) {
+      await supabase.from('covers').delete().eq('id', id);
+      fetchSubmissions();
+    }
+  };
+
+  const handleAdminAdd = async (payload) => {
+    await supabase.from('covers').insert([{...payload, votes:0, is_approved:true}]);
+    fetchSubmissions();
   };
 
   const approved = subs.filter(s => s.is_approved);
-  const totalVotes = subs.reduce((a, s) => a + (s.votes || 0), 0);
+  const sorted = [...approved].sort((a,b) => sortBy==="votes" ? b.votes-a.votes : b.id-a.id);
+  const totalVotes = subs.reduce((a,s) => a+s.votes, 0);
+
+  const resetForm = () => {
+    setSubmitted(false); setFName(""); setFBatch(""); setFTitle(""); setFDesc(""); setFFb(""); setFile(null);
+  };
+
+  const nav = p => { setPage(p); window.scrollTo(0,0); };
 
   return (
     <div style={{ minHeight:"100vh", background:C.bg }}>
-      <nav style={{ position:"sticky", top:0, zIndex:200, background:"rgba(247,246,243,0.94)", backdropFilter:"blur(12px)", borderBottom:`1px solid ${C.bdr}`, padding:"0 24px", height:56, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-        <div onClick={() => setPage("home")} style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer" }}>
-          <div style={{ width:28, height:28, background:C.ac, borderRadius:6 }}></div>
-          <div style={{ fontSize:13, fontWeight:700 }}>BUTEX <span style={{ color:C.t2, fontWeight:400 }}>COVER</span></div>
+      <nav style={{
+        position:"sticky", top:0, zIndex:200,
+        background:"rgba(247,246,243,0.94)", backdropFilter:"blur(12px)",
+        borderBottom:`1px solid ${C.bdr}`, padding:"0 24px", height:56,
+        display:"flex", alignItems:"center", justifyContent:"space-between",
+      }}>
+        <div onClick={() => nav("home")} style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer" }}>
+          <div style={{ width:28, height:28, background:C.ac, borderRadius:6, display:"flex", alignItems:"center", justifyContent:"center" }}>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="#fff"><rect x="0" y="0" width="6" height="6" rx="1"/><rect x="8" y="0" width="6" height="6" rx="1"/><rect x="0" y="8" width="6" height="6" rx="1"/><rect x="8" y="8" width="6" height="6" rx="1"/></svg>
+          </div>
+          <div>
+            <div style={{ fontSize:13, fontWeight:700, color:C.t1, lineHeight:1 }}>BUTEX</div>
+            <div style={{ fontSize:9, color:C.t2 }}>COVER SELECTION</div>
+          </div>
         </div>
-        <div style={{ display:"flex", gap:5 }}>
-          {["home", "gallery", "submit"].map(p => (
-            <button key={p} className="nav-btn" onClick={() => setPage(p)} style={{ background: page===p ? "rgba(45,107,228,0.1)" : "none", color: page===p ? C.ac : C.t2, border:"none", borderRadius:6, padding:"6px 12px", cursor:"pointer", textTransform:"capitalize" }}>{p}</button>
+        <div style={{ display:"flex", alignItems:"center", gap:2 }}>
+          {[["home","Home"],["gallery","Gallery"],["submit","Submit"],["results","Results"]].map(([p,l]) => (
+            <button key={p} className="nav-btn" onClick={() => nav(p)} style={{
+              background: page===p ? "rgba(45,107,228,0.1)" : "transparent",
+              color: page===p ? C.ac : C.t2, border:"none", borderRadius:6, padding:"6px 13px", fontSize:13, cursor:"pointer"
+            }}><span className="nav-label">{l}</span></button>
           ))}
-          <button onClick={() => setAdminOpen(true)} style={{ border:`1px solid ${C.bdr}`, background:"none", padding:"4px 8px", borderRadius:5, cursor:"pointer" }}>⚙</button>
+          <button onClick={() => setAdminOpen(true)} style={{ marginLeft:6, background:"none", border:`1px solid ${C.bdr}`, borderRadius:5, padding:"4px 9px", cursor:"pointer" }}>⚙</button>
         </div>
       </nav>
 
-      <main style={{ maxWidth:1080, margin:"0 auto", padding:"0 24px" }}>
-        {page === "home" && (
-          <div className="fade-in" style={{ padding:"60px 0" }}>
-            <h1 style={{ fontSize:42, fontWeight:700, marginBottom:10 }}>Apparel Engineering 2026</h1>
-            <p style={{ color:C.t2, marginBottom:30 }}>Vote for our official department cover design.</p>
-            <div style={{ display:"flex", gap:10 }}>
-              <button className="btn-p" onClick={() => setPage("submit")}>Submit Design</button>
-              <button className="btn-s" onClick={() => setPage("gallery")}>Browse Gallery</button>
-            </div>
-            <div style={{ display:"flex", gap:12, marginTop:40 }}>
-              <div style={{ background:"#fff", padding:20, borderRadius:10, flex:1, border:`1px solid ${C.bdr}` }}>
-                <div style={{ fontSize:24, fontWeight:700 }}>{approved.length}</div>
-                <div style={{ fontSize:11, color:C.t2 }}>SUBMISSIONS</div>
-              </div>
-              <div style={{ background:"#fff", padding:20, borderRadius:10, flex:1, border:`1px solid ${C.bdr}` }}>
-                <div style={{ fontSize:24, fontWeight:700 }}>{totalVotes}</div>
-                <div style={{ fontSize:11, color:C.t2 }}>TOTAL VOTES</div>
-              </div>
-            </div>
-          </div>
-        )}
+      {adminOpen && <AdminModal onClose={() => setAdminOpen(false)} subs={subs} onToggle={handleAdminToggle} onDelete={handleAdminDelete} onAdd={handleAdminAdd} />}
 
-        {page === "gallery" && (
-          <div className="fade-in" style={{ padding:"40px 0" }}>
-            <h2 style={{ marginBottom:20 }}>Design Gallery</h2>
-            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(280px, 1fr))", gap:20 }}>
-              {approved.map(s => (
-                <div key={s.id} className="card">
-                  <img src={s.image_url} style={{ height:180, objectFit:"cover" }} />
-                  <div style={{ padding:15 }}>
-                    <div style={{ fontWeight:700 }}>{s.cover_title}</div>
-                    <div style={{ fontSize:11, color:C.t2, marginBottom:10 }}>{s.full_name} · {s.Batch_Section}</div>
-                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                      <span style={{ fontWeight:700 }}>👍 {s.votes || 0}</span>
-                      <button className="vote-btn" disabled={votedIds.has(s.id)} onClick={() => handleVote(s.id, s.votes || 0)}>
-                        {votedIds.has(s.id) ? "Voted" : "Vote"}
-                      </button>
-                    </div>
-                  </div>
+      <main style={{ maxWidth:1080, margin:"0 auto", padding:"0 24px" }}>
+        {page==="home" && (
+          <div className="fade-in">
+            <div style={{ padding:"70px 0 44px", borderBottom:`1px solid ${C.bdr}` }}>
+              <p style={{ fontSize:11, fontWeight:700, letterSpacing:2.5, color:C.ac, textTransform:"uppercase", marginBottom:18 }}>Bangladesh University of Textiles · 2026</p>
+              <h1 style={{ fontSize:"clamp(28px,5vw,50px)", fontWeight:700, lineHeight:1.15, color:C.t1, maxWidth:500, marginBottom:16 }}>Department Cover<br/>Selection</h1>
+              <p style={{ fontSize:15, color:C.t2, maxWidth:400, lineHeight:1.85, marginBottom:32 }}>Submit your cover design, vote for your favorite, and see which design represents our department in 2026.</p>
+              <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
+                <Btn primary onClick={() => nav("submit")}>Submit Your Design</Btn>
+                <Btn onClick={() => nav("gallery")}>Browse Designs</Btn>
+              </div>
+            </div>
+            <div style={{ display:"flex", gap:14, padding:"26px 0 30px", borderBottom:`1px solid ${C.bdr}`, flexWrap:"wrap" }}>
+              {[{label:"Submissions", val:approved.length},{label:"Total Votes", val:totalVotes},{label:"Days Left", val:tl.d},{label:"Time Left", val:`${pad(tl.h)}:${pad(tl.m)}:${pad(tl.s)}`}].map(({label,val}) => (
+                <div key={label} style={{ padding:"14px 22px", background:C.sur, borderRadius:8, border:`1px solid ${C.bdr}`, textAlign:"center", minWidth:110 }}>
+                  <div style={{ fontSize:22, fontWeight:700, color:C.t1 }}>{val}</div>
+                  <div style={{ fontSize:11, color:C.t2, marginTop:3 }}>{label}</div>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {page === "submit" && (
-          <div className="fade-in" style={{ maxWidth:450, padding:"50px 0" }}>
-            <h2 style={{ marginBottom:20 }}>Submit Design</h2>
-            <div style={{ display:"flex", flexDirection:"column", gap:15 }}>
-              <input className="fi" placeholder="Full Name *" onChange={e => setFName(e.target.value)} />
-              <input className="fi" placeholder="Batch / Section *" onChange={e => setFBatch(e.target.value)} />
-              <input className="fi" placeholder="Cover Title *" onChange={e => setFTitle(e.target.value)} />
-              <textarea className="fi" rows={3} placeholder="Description" onChange={e => setFDesc(e.target.value)} />
-              <div className="upload-zone" onClick={() => fileInputRef.current.click()}>
-                <div style={{ fontSize:13, fontWeight:600 }}>{fFile ? fFile.name : "Click to Upload Design *"}</div>
-                <input type="file" ref={fileInputRef} hidden onChange={e => setFFile(e.target.files[0])} />
+        {page==="gallery" && (
+          <div className="fade-in" style={{ padding:"48px 0 72px" }}>
+            <h1 style={{ fontSize:26, fontWeight:700, marginBottom:6, color:C.t1 }}>Gallery</h1>
+            <p style={{ fontSize:13, color:C.t2, marginBottom:26 }}>{approved.length} design{approved.length!==1?"s":""} from the community</p>
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(210px,1fr))", gap:14 }}>
+              {sorted.map(s => <Card key={s.id} s={s} onVote={handleVote} voted={votedIds.has(s.id)} />)}
+            </div>
+          </div>
+        )}
+
+        {page==="submit" && (
+          <div className="fade-in" style={{ maxWidth:480, padding:"52px 0 80px" }}>
+            {submitted ? (
+              <div style={{ textAlign:"center", paddingTop:24 }}>
+                <h2 style={{ fontSize:22, fontWeight:700, color:"#2D9A5B", marginBottom:10 }}>Design Submitted!</h2>
+                <p style={{ fontSize:14, color:C.t2, marginBottom:28 }}>Pending admin review. Once approved it will appear in the gallery.</p>
+                <Btn primary onClick={() => { nav("gallery"); resetForm(); }}>View Gallery</Btn>
               </div>
-              <button className="btn-p" disabled={loading} onClick={handleUpload}>{loading ? "Uploading..." : "Submit for Review"}</button>
+            ) : (
+              <div>
+                <h1 style={{ fontSize:24, fontWeight:700, marginBottom:6, color:C.t1 }}>Submit Your Design</h1>
+                <div style={{ marginBottom:18 }}>
+                  <label style={{ display:"block", fontSize:12, fontWeight:600, color:C.t2, marginBottom:6 }}>Full Name *</label>
+                  <input className="fi" value={fName} onChange={e => setFName(e.target.value)} placeholder="Full name" />
+                </div>
+                <div style={{ marginBottom:18 }}>
+                  <label style={{ display:"block", fontSize:12, fontWeight:600, color:C.t2, marginBottom:6 }}>Batch / Section</label>
+                  <input className="fi" value={fBatch} onChange={e => setFBatch(e.target.value)} placeholder="e.g. BUTEX '28" />
+                </div>
+                <div style={{ marginBottom:18 }}>
+                  <label style={{ display:"block", fontSize:12, fontWeight:600, color:C.t2, marginBottom:6 }}>Cover Title *</label>
+                  <input className="fi" value={fTitle} onChange={e => setFTitle(e.target.value)} placeholder="Design title" />
+                </div>
+                <div className="upload-zone" onClick={() => fileInputRef.current.click()} style={{
+                  border:`2px dashed ${C.bdr}`, borderRadius:8, padding:"28px 20px", textAlign:"center", marginBottom:24, cursor:"pointer"
+                }}>
+                  <input type="file" ref={fileInputRef} hidden onChange={e => setFile(e.target.files[0])} accept="image/*" />
+                  <div style={{ fontSize:13, color:C.t1, fontWeight:500 }}>{file ? file.name : "Upload cover image"}</div>
+                  <div style={{ fontSize:12, color:C.t2 }}>PNG or JPG</div>
+                </div>
+                <Btn primary onClick={handleSubmit} loading={loading}>Submit Design</Btn>
+              </div>
+            )}
+          </div>
+        )}
+
+        {page==="results" && (
+          <div className="fade-in" style={{ padding:"48px 0 72px" }}>
+            <h1 style={{ fontSize:26, fontWeight:700, marginBottom:36, color:C.t1 }}>Live Rankings</h1>
+            <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+              {sorted.map((s,i) => (
+                <div key={s.id} style={{ background:C.sur, border:`1px solid ${C.bdr}`, borderRadius:8, padding:"12px 16px", display:"flex", alignItems:"center", gap:12 }}>
+                  <div style={{ width:28, height:28, borderRadius:"50%", background:C.bg, display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700 }}>{i+1}</div>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontWeight:600, fontSize:13 }}>{s.cover_title}</div>
+                    <div style={{ fontSize:11, color:C.t2 }}>{s.full_name}</div>
+                  </div>
+                  <div style={{ fontSize:13, fontWeight:700 }}>{s.votes} votes</div>
+                </div>
+              ))}
             </div>
           </div>
         )}
       </main>
-
-      {adminOpen && (
-        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.3)", backdropFilter:"blur(4px)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:1000 }}>
-          <div style={{ background:"#fff", width:500, borderRadius:12, padding:25 }}>
-            <div style={{ display:"flex", justifyContent:"space-between", marginBottom:20 }}>
-              <h3>Admin Management</h3>
-              <button onClick={() => setAdminOpen(false)} style={{ border:"none", background:"none", cursor:"pointer", fontSize:20 }}>×</button>
-            </div>
-            {!isAuth ? (
-              <input className="fi" type="password" placeholder="Password" onKeyDown={e => e.key === 'Enter' && e.target.value === ADMIN_PW && setIsAuth(true)} />
-            ) : (
-              <div style={{ display:"flex", flexDirection:"column", gap:10, maxHeight:400, overflowY:"auto" }}>
-                {subs.map(s => (
-                  <div key={s.id} className="admin-row" style={{ padding:10, border:`1px solid ${C.bdr}`, borderRadius:8, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                    <div>
-                      <div style={{ fontSize:13, fontWeight:600 }}>{s.cover_title}</div>
-                      <div style={{ fontSize:11, color:C.t2 }}>{s.full_name} · {s.votes} votes</div>
-                    </div>
-                    <button className="btn-s" style={{ padding:"5px 10px", fontSize:11 }} onClick={() => toggleApproval(s.id, s.is_approved)}>
-                      {s.is_approved ? "Hide" : "Approve"}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
