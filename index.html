@@ -36,7 +36,6 @@
 <body>
 <div id="root"></div>
 
-<!-- Required Scripts -->
 <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -45,25 +44,21 @@
 <script type="text/babel">
 const { useState, useEffect, useRef } = React;
 
-// ── SUPABASE CONFIG ──
+// ── SUPABASE CONNECTION ──
 const SUPABASE_URL = "https://bjruudirvlenbouuqytk.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqcnV1ZGlydmxlbmJvdXVxeXRrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgxNjY2ODUsImV4cCI6MjA5Mzc0MjY4NX0.GJzWUrOFdfeKf4nCLV7d0MGfb02wqnhGBIO8wsy97SU";
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const ADMIN_PW = "butex@admin2026";
-const CHIPS    = ["#4F7DCA","#5B9B72","#C07D4A","#8B68B0","#4A8FA8","#B05870"];
 const C = { bg:"#F7F6F3", sur:"#fff", bdr:"#E4E2DC", t1:"#1A1916", t2:"#6B6862", ac:"#2D6BE4" };
-
-const chipColor = s => CHIPS[s.id % CHIPS.length];
-const pad = n => String(n).padStart(2,"0");
 
 function App() {
   const [page, setPage] = useState("home");
   const [subs, setSubs] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [votedIds, setVotedIds] = useState(new Set());
   const [adminOpen, setAdminOpen] = useState(false);
   const [isAuth, setIsAuth] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [tl, setTl] = useState({ d:12, h:8, m:34, s:59 });
   const fileInputRef = useRef(null);
 
@@ -92,26 +87,26 @@ function App() {
     if (!error) setSubs(data);
   }
 
-  const handleSubmit = async () => {
-    if (!fName || !fTitle || !fFile) return alert("Required: Name, Title, and Image!");
+  const handleUpload = async () => {
+    if (!fName || !fTitle || !fFile) return alert("Required: Name, Title, and Design File!");
     setLoading(true);
     try {
-      const fileName = `${Date.now()}-${fFile.name}`;
-      const { error: storageError } = await supabaseClient.storage.from('covers').upload(fileName, fFile);
-      if (storageError) throw storageError;
+      const fileExt = fFile.name.split('.').pop();
+      const fileName = `${Date.now()}.${fileExt}`;
+      const { error: uploadError } = await supabaseClient.storage.from('covers').upload(fileName, fFile);
+      if (uploadError) throw uploadError;
 
       const { data: urlData } = supabaseClient.storage.from('covers').getPublicUrl(fileName);
       
       const { error: dbError } = await supabaseClient.from('covers').insert([{
-        full_name: fName, batch_section: fBatch, cover_title: fTitle,
+        full_name: fName, Batch_Section: fBatch, cover_title: fTitle,
         description: fDesc, facebook_profile: fFb, image_url: urlData.publicUrl,
         is_approved: false, votes: 0
       }]);
       if (dbError) throw dbError;
 
-      alert("Success! Your design is pending admin review.");
+      alert("Successfully submitted for review!");
       setPage("home");
-      setFFile(null);
       fetchSubmissions();
     } catch (err) { alert(err.message); }
     setLoading(false);
@@ -126,8 +121,8 @@ function App() {
     }
   };
 
-  const handleToggleApproval = async (id, currentStatus) => {
-    const { error } = await supabaseClient.from('covers').update({ is_approved: !currentStatus }).eq('id', id);
+  const toggleApproval = async (id, status) => {
+    const { error } = await supabaseClient.from('covers').update({ is_approved: !status }).eq('id', id);
     if (!error) fetchSubmissions();
   };
 
@@ -136,14 +131,10 @@ function App() {
 
   return (
     <div style={{ minHeight:"100vh", background:C.bg }}>
-      {/* ── Navbar ── */}
       <nav style={{ position:"sticky", top:0, zIndex:200, background:"rgba(247,246,243,0.94)", backdropFilter:"blur(12px)", borderBottom:`1px solid ${C.bdr}`, padding:"0 24px", height:56, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
         <div onClick={() => setPage("home")} style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer" }}>
           <div style={{ width:28, height:28, background:C.ac, borderRadius:6 }}></div>
-          <div>
-            <div style={{ fontSize:13, fontWeight:700, color:C.t1 }}>BUTEX</div>
-            <div style={{ fontSize:9, color:C.t2 }}>COVER SELECTION</div>
-          </div>
+          <div style={{ fontSize:13, fontWeight:700 }}>BUTEX <span style={{ color:C.t2, fontWeight:400 }}>COVER</span></div>
         </div>
         <div style={{ display:"flex", gap:5 }}>
           {["home", "gallery", "submit"].map(p => (
@@ -154,43 +145,37 @@ function App() {
       </nav>
 
       <main style={{ maxWidth:1080, margin:"0 auto", padding:"0 24px" }}>
-        
-        {/* ══ HOME ══ */}
         {page === "home" && (
-          <div className="fade-in">
-            <div style={{ padding:"70px 0 44px", borderBottom:`1px solid ${C.bdr}` }}>
-              <p style={{ fontSize:11, fontWeight:700, color:C.ac, letterSpacing:2, marginBottom:15 }}>APPAREL ENGINEERING · 2026</p>
-              <h1 style={{ fontSize:42, fontWeight:700, lineHeight:1.1, marginBottom:15 }}>Department Cover<br/>Selection</h1>
-              <p style={{ maxWidth:400, color:C.t2, lineHeight:1.6, marginBottom:30 }}>Upload your design, vote for your favorite, and let the batch decide our official cover.</p>
-              <div style={{ display:"flex", gap:10 }}>
-                <button className="btn-p" onClick={() => setPage("submit")}>Submit Design</button>
-                <button className="btn-s" onClick={() => setPage("gallery")}>Browse Gallery</button>
-              </div>
+          <div className="fade-in" style={{ padding:"60px 0" }}>
+            <h1 style={{ fontSize:42, fontWeight:700, marginBottom:10 }}>Apparel Engineering 2026</h1>
+            <p style={{ color:C.t2, marginBottom:30 }}>Vote for our official department cover design.</p>
+            <div style={{ display:"flex", gap:10 }}>
+              <button className="btn-p" onClick={() => setPage("submit")}>Submit Design</button>
+              <button className="btn-s" onClick={() => setPage("gallery")}>Browse Gallery</button>
             </div>
-            <div style={{ display:"flex", gap:12, padding:"25px 0", borderBottom:`1px solid ${C.bdr}` }}>
-              {[ {l:"Submissions", v:approved.length}, {l:"Total Votes", v:totalVotes}, {l:"Time Left", v:`${pad(tl.h)}:${pad(tl.m)}:${pad(tl.s)}`} ].map(i => (
-                <div key={i.l} style={{ background:"#fff", border:`1px solid ${C.bdr}`, padding:"15px 20px", borderRadius:8, textAlign:"center", flex:1 }}>
-                  <div style={{ fontSize:20, fontWeight:700 }}>{i.v}</div>
-                  <div style={{ fontSize:10, color:C.t2, textTransform:"uppercase" }}>{i.l}</div>
-                </div>
-              ))}
+            <div style={{ display:"flex", gap:12, marginTop:40 }}>
+              <div style={{ background:"#fff", padding:20, borderRadius:10, flex:1, border:`1px solid ${C.bdr}` }}>
+                <div style={{ fontSize:24, fontWeight:700 }}>{approved.length}</div>
+                <div style={{ fontSize:11, color:C.t2 }}>SUBMISSIONS</div>
+              </div>
+              <div style={{ background:"#fff", padding:20, borderRadius:10, flex:1, border:`1px solid ${C.bdr}` }}>
+                <div style={{ fontSize:24, fontWeight:700 }}>{totalVotes}</div>
+                <div style={{ fontSize:11, color:C.t2 }}>TOTAL VOTES</div>
+              </div>
             </div>
           </div>
         )}
 
-        {/* ══ GALLERY ══ */}
         {page === "gallery" && (
           <div className="fade-in" style={{ padding:"40px 0" }}>
-            <h2 style={{ marginBottom:25 }}>Design Gallery</h2>
-            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(240px, 1fr))", gap:15 }}>
+            <h2 style={{ marginBottom:20 }}>Design Gallery</h2>
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(280px, 1fr))", gap:20 }}>
               {approved.map(s => (
                 <div key={s.id} className="card">
-                  <div style={{ height:140, background:C.bg }}>
-                    <img src={s.image_url} style={{ width:"100%", height:"100%", objectFit:"cover" }} />
-                  </div>
+                  <img src={s.image_url} style={{ height:180, objectFit:"cover" }} />
                   <div style={{ padding:15 }}>
-                    <div style={{ fontWeight:700, fontSize:14 }}>{s.cover_title}</div>
-                    <div style={{ fontSize:11, color:C.t2, marginBottom:10 }}>{s.full_name} · {s.batch_section}</div>
+                    <div style={{ fontWeight:700 }}>{s.cover_title}</div>
+                    <div style={{ fontSize:11, color:C.t2, marginBottom:10 }}>{s.full_name} · {s.Batch_Section}</div>
                     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                       <span style={{ fontWeight:700 }}>👍 {s.votes || 0}</span>
                       <button className="vote-btn" disabled={votedIds.has(s.id)} onClick={() => handleVote(s.id, s.votes || 0)}>
@@ -204,52 +189,44 @@ function App() {
           </div>
         )}
 
-        {/* ══ SUBMIT ══ */}
         {page === "submit" && (
           <div className="fade-in" style={{ maxWidth:450, padding:"50px 0" }}>
-            <h2 style={{ marginBottom:10 }}>Submit Your Design</h2>
-            <p style={{ color:C.t2, fontSize:13, marginBottom:30 }}>Fill the details and upload your cover artwork.</p>
+            <h2 style={{ marginBottom:20 }}>Submit Design</h2>
             <div style={{ display:"flex", flexDirection:"column", gap:15 }}>
               <input className="fi" placeholder="Full Name *" onChange={e => setFName(e.target.value)} />
-              <input className="fi" placeholder="Batch / Section (e.g. BUTEX 50, A)" onChange={e => setFBatch(e.target.value)} />
+              <input className="fi" placeholder="Batch / Section *" onChange={e => setFBatch(e.target.value)} />
               <input className="fi" placeholder="Cover Title *" onChange={e => setFTitle(e.target.value)} />
               <textarea className="fi" rows={3} placeholder="Description" onChange={e => setFDesc(e.target.value)} />
               <div className="upload-zone" onClick={() => fileInputRef.current.click()}>
-                <div style={{ fontSize:13, fontWeight:600 }}>{fFile ? fFile.name : "Click to Upload Image *"}</div>
-                <div style={{ fontSize:11, color:C.t2 }}>PNG or JPG (Recommended 1640x924)</div>
+                <div style={{ fontSize:13, fontWeight:600 }}>{fFile ? fFile.name : "Click to Upload Design *"}</div>
                 <input type="file" ref={fileInputRef} hidden onChange={e => setFFile(e.target.files[0])} />
               </div>
-              <button className="btn-p" disabled={loading} onClick={handleSubmit}>{loading ? "Uploading..." : "Submit to Admin"}</button>
+              <button className="btn-p" disabled={loading} onClick={handleUpload}>{loading ? "Uploading..." : "Submit for Review"}</button>
             </div>
           </div>
         )}
       </main>
 
-      {/* ── Admin Modal ── */}
       {adminOpen && (
-        <div style={{ position:"fixed", inset:0, zIndex:1000, background:"rgba(0,0,0,0.3)", backdropFilter:"blur(4px)", display:"flex", alignItems:"center", justifyContent:"center" }}>
-          <div style={{ background:"#fff", width:"90%", maxWidth:600, borderRadius:12, padding:25, maxHeight:"85vh", overflowY:"auto" }}>
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.3)", backdropFilter:"blur(4px)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:1000 }}>
+          <div style={{ background:"#fff", width:500, borderRadius:12, padding:25 }}>
             <div style={{ display:"flex", justifyContent:"space-between", marginBottom:20 }}>
-              <h3>Admin Panel</h3>
-              <button onClick={() => setAdminOpen(false)} style={{ background:"none", border:"none", fontSize:20, cursor:"pointer" }}>×</button>
+              <h3>Admin Management</h3>
+              <button onClick={() => setAdminOpen(false)} style={{ border:"none", background:"none", cursor:"pointer", fontSize:20 }}>×</button>
             </div>
             {!isAuth ? (
-              <div style={{ textAlign:"center", padding:20 }}>
-                <input className="fi" type="password" placeholder="Admin Password" onKeyDown={e => e.key==="Enter" && e.target.value===ADMIN_PW && setIsAuth(true)} />
-              </div>
+              <input className="fi" type="password" placeholder="Password" onKeyDown={e => e.key === 'Enter' && e.target.value === ADMIN_PW && setIsAuth(true)} />
             ) : (
-              <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+              <div style={{ display:"flex", flexDirection:"column", gap:10, maxHeight:400, overflowY:"auto" }}>
                 {subs.map(s => (
-                  <div key={s.id} className="admin-row" style={{ padding:12, border:`1px solid ${C.bdr}`, borderRadius:8, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                  <div key={s.id} className="admin-row" style={{ padding:10, border:`1px solid ${C.bdr}`, borderRadius:8, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                     <div>
-                      <div style={{ fontWeight:600 }}>{s.cover_title}</div>
+                      <div style={{ fontSize:13, fontWeight:600 }}>{s.cover_title}</div>
                       <div style={{ fontSize:11, color:C.t2 }}>{s.full_name} · {s.votes} votes</div>
                     </div>
-                    <div style={{ display:"flex", gap:5 }}>
-                      <button className="btn-s" style={{ padding:"5px 10px", fontSize:11 }} onClick={() => handleToggleApproval(s.id, s.is_approved)}>
-                        {s.is_approved ? "Hide" : "Approve"}
-                      </button>
-                    </div>
+                    <button className="btn-s" style={{ padding:"5px 10px", fontSize:11 }} onClick={() => toggleApproval(s.id, s.is_approved)}>
+                      {s.is_approved ? "Hide" : "Approve"}
+                    </button>
                   </div>
                 ))}
               </div>
