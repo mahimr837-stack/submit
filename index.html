@@ -26,8 +26,11 @@
     .fade-in { animation: fadeIn 0.3s ease both; }
 
     .nav-btn:hover { background: rgba(45,107,228,0.08) !important; color: #2D6BE4 !important; }
-    .card { transition: box-shadow 0.2s, transform 0.2s; background: #fff; border: 1px solid #E4E2DC; border-radius: 10px; overflow: hidden; display: flex; flexDirection: column; }
+    
+    /* FIX: Changed flexDirection to flex-direction */
+    .card { transition: box-shadow 0.2s, transform 0.2s; background: #fff; border: 1px solid #E4E2DC; border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; }
     .card:hover { box-shadow: 0 4px 18px rgba(0,0,0,0.08); transform: translateY(-2px); }
+    
     .btn-p { background: #2D6BE4; color: #fff; border: none; padding: 10px 22px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px; transition: filter 0.15s; }
     .btn-p:hover:not(:disabled) { filter: brightness(1.1); }
     .btn-s { background: #fff; border: 1px solid #E4E2DC; padding: 10px 22px; border-radius: 6px; cursor: pointer; font-size: 13px; }
@@ -48,6 +51,7 @@
 const { useState, useEffect } = React;
 
 /* --- CONFIG --- */
+// Make sure to replace these with your actual Supabase project credentials
 const SUPABASE_URL = "YOUR_SUPABASE_URL"; 
 const SUPABASE_KEY = "YOUR_SUPABASE_ANON_KEY"; 
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -58,14 +62,20 @@ const C = { bg:"#F7F6F3", sur:"#fff", bdr:"#E4E2DC", t1:"#1A1916", t2:"#6B6862",
 function App() {
   const [page, setPage] = useState("home");
   const [subs, setSubs] = useState([]);
-  const [votedIds, setVotedIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState("votes");
+
+  // FIX: Initialize votedIds from localStorage to persist votes after refresh
+  const [votedIds, setVotedIds] = useState(() => {
+    const savedVotes = localStorage.getItem('butex_voted_ids');
+    return savedVotes ? new Set(JSON.parse(savedVotes)) : new Set();
+  });
 
   // Submission Form State
   const [fName, setFName] = useState("");
   const [fBatch, setFBatch] = useState("");
   const [fTitle, setFTitle] = useState("");
+  const [fImageUrl, setFImageUrl] = useState(""); // FIX: Added image URL state
   const [submitted, setSubmitted] = useState(false);
 
   useEffect(() => { fetchData(); }, []);
@@ -79,19 +89,42 @@ function App() {
 
   const handleVote = async (id, currentVotes) => {
     if (votedIds.has(id)) return;
+
+    // FIX: Optimistic UI Update & LocalStorage Save
+    const updatedVotedIds = new Set([...votedIds, id]);
+    setVotedIds(updatedVotedIds);
+    localStorage.setItem('butex_voted_ids', JSON.stringify([...updatedVotedIds]));
+
+    // Instantly update the UI so there is no lag
+    setSubs(prevSubs => prevSubs.map(s => 
+      s.id === id ? { ...s, votes: (s.votes || 0) + 1 } : s
+    ));
+
+    // Send update to database in the background
     const { error } = await supabase.from('covers').update({ votes: (currentVotes || 0) + 1 }).eq('id', id);
-    if (!error) {
-      setVotedIds(p => new Set([...p, id]));
-      fetchData();
+    if (error) {
+      console.error("Error updating vote:", error);
+      // Optional: Handle error by reverting the optimistic update
     }
   };
 
   const handleSubmit = async () => {
     if (!fName.trim() || !fTitle.trim()) return;
     const { error } = await supabase.from('covers').insert([
-      { full_name: fName, batch_section: fBatch, cover_title: fTitle, votes: 0, is_approved: false }
+      { 
+        full_name: fName, 
+        batch_section: fBatch, 
+        cover_title: fTitle, 
+        image_url: fImageUrl, // FIX: Include image URL in submission
+        votes: 0, 
+        is_approved: false 
+      }
     ]);
-    if (!error) setSubmitted(true);
+    if (!error) {
+      setSubmitted(true);
+      // Clear form
+      setFName(""); setFBatch(""); setFTitle(""); setFImageUrl("");
+    }
   };
 
   const approved = subs.filter(s => s.is_approved);
@@ -169,7 +202,7 @@ function App() {
                   return (
                     <div key={s.id} className="card">
                       <div style={{ height: 112, background: color + "14", borderBottom: `1px solid ${C.bdr}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                         {s.image_url ? <img src={s.image_url} style={{width:'100%', height:'100%', objectFit:'cover'}} /> : <span style={{fontSize:10, fontWeight:700, color}}>BUTEX 2026</span>}
+                         {s.image_url ? <img src={s.image_url} alt={s.cover_title} style={{width:'100%', height:'100%', objectFit:'cover'}} /> : <span style={{fontSize:10, fontWeight:700, color}}>BUTEX 2026</span>}
                       </div>
                       <div style={{ padding: 16 }}>
                         <h3 style={{ fontSize: 15, marginBottom: 4 }}>{s.cover_title}</h3>
@@ -230,6 +263,10 @@ function App() {
                             <input className="fi" placeholder="Full Name" value={fName} onChange={e => setFName(e.target.value)} />
                             <input className="fi" placeholder="Batch / Section" value={fBatch} onChange={e => setFBatch(e.target.value)} />
                             <input className="fi" placeholder="Cover Title" value={fTitle} onChange={e => setFTitle(e.target.value)} />
+                            
+                            {/* FIX: Added Image URL input */}
+                            <input className="fi" placeholder="Cover Image URL (e.g. Imgur link)" value={fImageUrl} onChange={e => setFImageUrl(e.target.value)} />
+                            
                             <button className="btn-p" onClick={handleSubmit}>Submit for Review</button>
                         </div>
                     </div>
